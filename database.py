@@ -2,11 +2,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy.orm import sessionmaker, Session
 from models import Base
+from databases import Database
 
 DATABASE_URL = "postgresql://connector_xu3z_user:bFNP3icqOpvpxchbOaLlexo4M6OAzvY1@dpg-cs2n5et6l47c73blnmt0-a.oregon-postgres.render.com/connector_xu3z"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# For async support
+database = Database(DATABASE_URL)
 
 def get_db():
     db = SessionLocal()
