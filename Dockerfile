@@ -1,5 +1,5 @@
 # Use Python 3.9 as the parent image
-FROM python:3.9-slim
+FROM python:3.10-slim
 
 # Install system dependencies for MariaDB/MySQL
 RUN apt-get update && \
