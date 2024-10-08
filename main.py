@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import json
 from typing import Dict, List, Optional
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Depends, Query, Request, UploadFile, WebSocket, WebSocketDisconnect , status, websockets
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Depends, Query, Request, UploadFile, WebSocket, WebSocketDisconnect, requests , status, websockets
 from fastapi.exceptions import RequestValidationError
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from flask import jsonify
@@ -212,6 +212,111 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
         access_token=access_token,
         token_type="bearer"
     )
+
+
+
+
+
+
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
+
+
+# Google OAuth2 Token verification
+async def verify_google_token(token: str):
+    try:
+        id_info = id_token.verify_oauth2_token(token, google_requests.Request())
+        return id_info
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid Google Token")
+
+
+
+
+
+# Register user with Google OAuth2
+# Google OAuth2 Login
+@app.post("/google-login/")
+async def google_login(google_token: str, db: Session = Depends(get_db)):
+    id_info = await verify_google_token(google_token)
+    email = id_info['email']
+
+    db_user = db.query(User).filter(User.email == email).first()
+    if not db_user:
+        # Register the user if they don't exist
+        db_user = User(
+            name=id_info.get("name"),
+            email=email,
+            password="",  # Empty password, since we are using Google for authentication
+        )
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+
+    access_token = create_access_token(data={"sub": db_user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+
+
+import requests
+
+GITHUB_CLIENT_ID = "Ov23liql1prInLFdkg1q"
+GITHUB_CLIENT_SECRET = "59711e8713a1ad73e8a1ce42295c4d62ccca4f82"
+
+
+
+# GitHub login request model
+class GithubLoginRequest(BaseModel):
+    github_token: str
+
+# Route for GitHub login
+@app.post("/auth/github")
+def github_login(code: str, db: Session = Depends(get_db)):
+    # Exchange authorization code for access token
+    token_url = "https://github.com/login/oauth/access_token"
+    headers = {"Accept": "application/json"}
+    payload = {
+        "client_id": GITHUB_CLIENT_ID,
+        "client_secret": GITHUB_CLIENT_SECRET,
+        "code": code
+    }
+    response = requests.post(token_url, headers=headers, data=payload)
+    token_data = response.json()
+
+    if "access_token" not in token_data:
+        raise HTTPException(status_code=400, detail="GitHub OAuth failed")
+
+    access_token = token_data["access_token"]
+
+    # Fetch user info from GitHub API
+    user_info_url = "https://api.github.com/user"
+    user_info_response = requests.get(user_info_url, headers={
+        "Authorization": f"Bearer {access_token}"
+    })
+    user_info = user_info_response.json()
+
+    # Check if user exists in the database
+    user = db.query(User).filter(User.email == user_info["email"]).first()
+    
+    if not user:
+        # Create new user if not exists
+        user = User(
+            email=user_info["email"],
+            name=user_info["login"],
+            bio=user_info.get("bio", ""),
+            password=None  # No password needed for OAuth
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    # Generate JWT token
+    access_token = create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer" , "user_id": user.id}
+
+
 
 
 
@@ -1631,6 +1736,148 @@ def get_recommendations(user_id: int, db: Session = Depends(get_db)):
     # Sort recommendations by similarity in descending order
     recommendations.sort(key=lambda x: x['similarity'], reverse=True)
     return recommendations
+
+
+
+
+
+
+
+
+
+
+
+
+@app.post("/upload_audio/")
+async def process_audio(
+    user_id: int,
+    audio: UploadFile = File(...),
+    db: Session = Depends(get_db)  # Adjust this import based on your project structure
+):
+    print("Audio processing started...")
+
+    # Step 1: Read audio file bytes
+    audio_bytes = await audio.read()  # Ensure you use the correct variable here
+
+    # Save the audio file temporarily for the OpenAI API
+    temp_audio_path = "temp_audio.mp3"
+    with open(temp_audio_path, "wb") as temp_file:
+        temp_file.write(audio_bytes)
+
+    # Step 2: Transcribe Audio using Whisper
+    try:
+        with open(temp_audio_path, "rb") as audio_file:
+            response = openai.Audio.transcribe(
+                model="whisper-1",  # Use the appropriate model as required
+                file=audio_file
+            )
+        transcription_text = response['text']  # Ensure the key access is correct
+    except openai.APIError as e:
+        raise HTTPException(status_code=500, detail=f"OpenAI API error: {e}")
+
+    # Step 3: Use GPT-4 to extract profile details from transcription
+    prompt = f"""
+    The following text is a user's spoken description of their profile. 
+    Extract their name, age, education, experience, and goals from the text, regardless of the format used. 
+    
+    Text: "{transcription_text}"
+    
+    Return the result in a JSON format with the keys: name, age, education, experience, goal.
+    If any information is missing or unclear, return null for that field.
+    """
+    
+    try:
+        gpt_response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.5,
+            max_tokens=300
+        )
+        
+        extracted_data = gpt_response['choices'][0]['message']['content'].strip()
+        
+        if not extracted_data:
+            return {"message": "Could not extract profile data from the transcription"}
+        
+        # Safely parse extracted data
+        extracted_data = json.loads(extracted_data)
+
+    except openai.APIError as e:
+        raise HTTPException(status_code=500, detail=f"OpenAI GPT-4 error: {e}")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Failed to decode extracted data")
+
+    # Step 4: Update User Profile in Database
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Update user's profile details with extracted information
+    user.name = extracted_data.get("name", user.name)
+    user.education = extracted_data.get("education", user.education)
+    user.experience = extracted_data.get("experience", user.experience)
+    user.goal = extracted_data.get("goal", user.goal)
+
+    db.commit()  # Commit the changes to the database
+
+    # Step 5: Generate New Embeddings for User
+    user_profile_text = f"Education: {user.education}\nExperience: {user.experience}\nGoals: {user.goal}"
+    user_embedding = utils.generate_embeddings(user_profile_text)
+
+    # Step 6: Fetch Other Users and Generate Embeddings
+    other_users = db.query(User).filter(User.id != user_id).all()
+    other_user_profiles = [
+        f"Education: {other_user.education}\nExperience: {other_user.experience}\nGoals: {other_user.goal}"
+        for other_user in other_users
+    ]
+    other_user_embeddings = utils.batch_generate_embeddings(other_user_profiles)
+
+    # Step 7: Calculate Similarities and Recommend Users
+    recommendations = []
+    for other_user, other_user_embedding in zip(other_users, other_user_embeddings):
+        similarity_score = utils.calculate_similarity(user_embedding, other_user_embedding)
+        if similarity_score > 0.87:  # Similarity threshold
+            recommendations.append({
+                "id": other_user.id,
+                "name": other_user.name,
+                "similarity": similarity_score,
+                "bio": other_user.bio,
+                "about": other_user.about,
+                "github": other_user.github,
+                "linkedin": other_user.linkedin,
+                "banner_image": other_user.banner_image,
+                "profile_image": other_user.profile_image,
+                "twitter_handle": other_user.twitter_handle
+            })
+
+    # Sort recommendations by similarity in descending order
+    recommendations.sort(key=lambda x: x['similarity'], reverse=True)
+    
+    return {
+        "message": "Profile updated and recommendations generated",
+        "recommendations": recommendations
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
