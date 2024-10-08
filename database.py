@@ -3,8 +3,10 @@ from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy.orm import sessionmaker, Session
 from models import Base
 from databases import Database
+import os
 
-DATABASE_URL = "postgresql://connector_xu3z_user:bFNP3icqOpvpxchbOaLlexo4M6OAzvY1@dpg-cs2n5et6l47c73blnmt0-a.oregon-postgres.render.com/connector_xu3z"
+# Load the DATABASE_URL from the environment
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
