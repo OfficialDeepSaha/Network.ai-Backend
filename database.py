@@ -3,7 +3,11 @@ from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy.orm import sessionmaker, Session
 from models import Base
 from databases import Database
+from dotenv import load_dotenv
 import os
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Load the DATABASE_URL from the environment
 DATABASE_URL = os.getenv("DATABASE_URL")
