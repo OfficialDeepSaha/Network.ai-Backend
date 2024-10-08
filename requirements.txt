@@ -286,8 +286,6 @@ python-telegram-bot==21.5
 pyttsx3==2.91
 pytz==2024.1
 pyvis==0.3.2
-pywin32==306
-pywin32-ctypes==0.2.3
 pyxnat==1.6.2
 PyYAML==6.0.2
 qdrant-client==1.11.3
