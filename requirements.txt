@@ -132,7 +132,7 @@ importlib_metadata==8.4.0
 importlib_resources==6.4.5
 inquirerpy==0.3.4
 installer==0.7.0
-instructor==0.5.2
+instructor==1.5.2
 ipython==8.28.0
 isodate==0.6.1
 itsdangerous==2.2.0
