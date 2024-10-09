@@ -22,4 +22,5 @@ uvicorn==0.31.0
 Werkzeug==3.0.4
 SQLAlchemy
 python-multipart
+google.oauth2
 psycopg2-binary==2.9.9
