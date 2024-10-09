@@ -2084,4 +2084,4 @@ def on_shutdown():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(sio_app, host="0.0.0.0", port=8000)
-    asyncio.run(start_server())      
+    # asyncio.run(start_server())      
