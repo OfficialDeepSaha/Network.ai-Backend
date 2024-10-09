@@ -5,7 +5,7 @@ from databases import Database
 import os
 
 # Load the DATABASE_URL from the environment (Render environment variables are already available)
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = "postgresql://connector_xu3z_user:bFNP3icqOpvpxchbOaLlexo4M6OAzvY1@dpg-cs2n5et6l47c73blnmt0-a.oregon-postgres.render.com/connector_xu3z"
 
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set")
