@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy.orm import sessionmaker, Session
 from models import Base
 
-# DATABASE_URL = "postgresql://postgres:1234@localhost/connector"
+
 
 DATABASE_URL= "postgresql://connector_xu3z_user:bFNP3icqOpvpxchbOaLlexo4M6OAzvY1@dpg-cs2n5et6l47c73blnmt0-a.oregon-postgres.render.com/connector_xu3z"
 
