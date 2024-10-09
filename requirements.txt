@@ -21,4 +21,5 @@ tweepy==4.14.0
 uvicorn==0.31.0
 Werkzeug==3.0.4
 SQLAlchemy
+python-multipart
 psycopg2-binary==2.9.9
