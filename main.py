@@ -25,7 +25,6 @@ from schemas import ActionEnum, AgentModel, Connection, ConnectionRequest, Conne
 import utils
 from decision_engine import DecisionEngine
 from engagement_module import EngagementModule
-from real_time import send_user_activity
 from retrain_model import retrain_model
 from fastapi.middleware.cors import CORSMiddleware
 from hashlib import sha256
