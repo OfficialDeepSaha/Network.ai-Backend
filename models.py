@@ -159,7 +159,7 @@ class Message(Base):
 
 
 
-DATABASE_URL = "postgresql://postgres:1234@localhost/connector"
+DATABASE_URL = "postgresql://postgres:VKTbOKIJLfiXXbIBOjddyXDQuPLqmySH@postgres.railway.internal:5432/railway"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
