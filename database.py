@@ -6,7 +6,7 @@ from fastapi import FastAPI, Depends
 
 
 
-DATABASE_URL= "postgresql://postgres:VKTbOKIJLfiXXbIBOjddyXDQuPLqmySH@postgres.railway.internal:5432/railway"
+DATABASE_URL= "postgresql://postgres:VKTbOKIJLfiXXbIBOjddyXDQuPLqmySH@autorack.proxy.rlwy.net:56448/railway"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
