@@ -10,6 +10,7 @@ from flask import jsonify
 from grpc import Status
 import httpx
 from jose import JWTError
+from requests_oauthlib import OAuth1Session
 from werkzeug.utils import escape  # Use escape if you need to quote URLs
 import jwt
 import numpy as np
@@ -23,8 +24,6 @@ from models import Chat, Document, GroupChat, GroupChatMember, GroupChatMessage,
 import models
 from schemas import ActionEnum, AgentModel, Connection, ConnectionRequest, ConnectionRequestResponse, ConnectionStatus, GroupChatMessageCreate, GroupChatMessageResponse, GroupChatResponse, GroupRequest, GroupRequestResponse, GroupRequestStatus, Subscription, UserCreate, UserUpdate, UserResponse, FeedbackCreate
 import utils
-from decision_engine import DecisionEngine
-from engagement_module import EngagementModule
 from retrain_model import retrain_model
 from fastapi.middleware.cors import CORSMiddleware
 from hashlib import sha256
@@ -266,13 +265,9 @@ GITHUB_CLIENT_SECRET = "59711e8713a1ad73e8a1ce42295c4d62ccca4f82"
 
 
 
-# GitHub login request model
-class GithubLoginRequest(BaseModel):
-    github_token: str
-
-# Route for GitHub login
-@app.post("/auth/github")
-def github_login(code: str, db: Session = Depends(get_db)):
+# Route for GitHub registration
+@app.post("/auth/github/register")
+def github_register(code: str, db: Session = Depends(get_db)):
     # Exchange authorization code for access token
     token_url = "https://github.com/login/oauth/access_token"
     headers = {"Accept": "application/json"}
@@ -281,6 +276,7 @@ def github_login(code: str, db: Session = Depends(get_db)):
         "client_secret": GITHUB_CLIENT_SECRET,
         "code": code
     }
+
     response = requests.post(token_url, headers=headers, data=payload)
     token_data = response.json()
 
@@ -296,24 +292,179 @@ def github_login(code: str, db: Session = Depends(get_db)):
     })
     user_info = user_info_response.json()
 
-    # Check if user exists in the database
+    # Sometimes GitHub doesn't return an email, so fetch it separately
+    if "email" not in user_info or not user_info["email"]:
+        email_url = "https://api.github.com/user/emails"
+        email_response = requests.get(email_url, headers={
+            "Authorization": f"Bearer {access_token}"
+        })
+        emails = email_response.json()
+        primary_email = next((email["email"] for email in emails if email["primary"]), None)
+        user_info["email"] = primary_email
+
+    if not user_info["email"]:
+        raise HTTPException(status_code=400, detail="Email not found from GitHub")
+
+    # Check if user is already registered
     user = db.query(User).filter(User.email == user_info["email"]).first()
     
-    if not user:
-        # Create new user if not exists
-        user = User(
-            email=user_info["email"],
-            name=user_info["login"],
-            bio=user_info.get("bio", ""),
-            password=None  # No password needed for OAuth
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+    if user:
+        # User already exists, reject registration
+        raise HTTPException(status_code=400, detail="User already registered")
 
-    # Generate JWT token
-    access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer" , "user_id": user.id}
+    # Create a new user if not exists
+    new_user = User(
+        email=user_info["email"],
+        name=user_info["login"],
+        bio=user_info.get("bio", ""),
+        password=None  # No password needed for OAuth registration
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    # Generate JWT token for the new user
+    jwt_token = create_access_token(data={"sub": new_user.email})
+
+    return {
+        "access_token": jwt_token,
+        "token_type": "bearer",
+        "user_id": new_user.id
+    }
+
+
+
+
+
+
+
+
+
+TWITTER_CLIENT_ID = "UfruUsV49AWQOHN8ftqnmwCZN"
+TWITTER_CLIENT_SECRET = "zVmX9lDY1GAPf9O5XYwQ3Xf3lr31PfbMzjCiNAovWBcSWGpAD6"
+TWITTER_CALLBACK_URL = "http://localhost:5173/auth/twitter/callback"
+
+# Step 1: Initiate Twitter OAuth
+@app.get("/api/twitter/register")
+async def twitter_register():
+    oauth = OAuth1Session(
+        TWITTER_CLIENT_ID,
+        client_secret=TWITTER_CLIENT_SECRET,
+        callback_uri=TWITTER_CALLBACK_URL
+    )
+    
+    try:
+        request_token_url = "https://api.twitter.com/oauth/request_token"
+        response = oauth.fetch_request_token(request_token_url)
+        oauth_token = response.get('oauth_token')
+        
+        if not oauth_token:
+            raise HTTPException(status_code=400, detail="Failed to get request token")
+
+        twitter_auth_url = f"https://api.twitter.com/oauth/authorize?oauth_token={oauth_token}"
+        return {"auth_url": twitter_auth_url}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error during Twitter OAuth: {str(e)}")
+
+@app.get("/api/twitter/callback")
+async def twitter_callback(
+    oauth_token: str, 
+    oauth_verifier: str, 
+    db: Session = Depends(get_db)
+):
+    oauth = OAuth1Session(TWITTER_CLIENT_ID, client_secret=TWITTER_CLIENT_SECRET)
+    
+    try:
+        access_token_url = "https://api.twitter.com/oauth/access_token"
+        token_data = {
+            "oauth_token": oauth_token,
+            "oauth_verifier": oauth_verifier
+        }
+        response = oauth.post(access_token_url, params=token_data)
+
+        if response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch access token from Twitter")
+
+        credentials = dict(item.split("=") for item in response.text.split("&"))
+        access_token = credentials.get("oauth_token")
+        access_token_secret = credentials.get("oauth_token_secret")
+        user_id = credentials.get("user_id")
+        screen_name = credentials.get("screen_name")
+
+        if not access_token or not access_token_secret:
+            raise HTTPException(status_code=400, detail="Failed to obtain access token.")
+
+        oauth = OAuth1Session(
+            TWITTER_CLIENT_ID,
+            client_secret=TWITTER_CLIENT_SECRET,
+            resource_owner_key=access_token,
+            resource_owner_secret=access_token_secret
+        )
+
+        verify_credentials_url = "https://api.twitter.com/1.1/account/verify_credentials.json"
+        user_info_response = oauth.get(verify_credentials_url, params={"include_email": "true"})
+
+        if user_info_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch user info from Twitter")
+
+        user_info = user_info_response.json()
+        user_email = user_info.get("email")
+
+        if not user_email:
+            raise HTTPException(status_code=400, detail="Email not available from Twitter. Ensure your app has email access.")
+
+        user = db.query(User).filter(User.email == user_email).first()
+
+        if user:
+            raise HTTPException(status_code=400, detail="User already registered.")
+
+        new_user = User(
+            email=user_email,
+            name=user_info.get("screen_name"),
+            bio=user_info.get("description", ""),
+            password=None
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+
+        jwt_token = create_access_token(data={"sub": new_user.email})
+
+        return {
+            "access_token": jwt_token,
+            "token_type": "bearer",
+            "user": {
+                "id": new_user.id,
+                "email": new_user.email,
+                "name": new_user.name,
+                "bio": new_user.bio
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error during Twitter callback: {str(e)}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1860,26 +2011,6 @@ async def process_audio(
     }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # Create or Update Agent
 @app.post("/create_or_update_agent/")
 def create_or_update_agent(agent: AgentModel, db: Session = Depends(get_db)):
@@ -2078,7 +2209,6 @@ async def message(sid, data):
 @app.on_event("shutdown")
 def on_shutdown():
     scheduler.shutdown()
-
    
 
 if __name__ == "__main__":
