@@ -32,7 +32,7 @@ class UserUpdate(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
-    name: str
+    name: Optional[str] = None
     email: str
     bio: Optional[str] = None
     education: Optional[str] = None
@@ -217,7 +217,7 @@ class GroupRequestResponse(BaseModel):
     sender_name: str  # Add this line
     target_user_id: int
     status: ConnectionStatus
-    created_at: datetime
+    created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None  # updated_at may not be present if not updated
 
     class Config:
