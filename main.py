@@ -251,8 +251,8 @@ async def google_login(google_token: str, db: Session = Depends(get_db)):
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
-
-    access_token = create_access_token(data={"sub": db_user.email})
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(data={"sub": db_user.email} , expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -324,7 +324,8 @@ def github_register(code: str, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     # Generate JWT token for the new user
-    jwt_token = create_access_token(data={"sub": new_user.email})
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    jwt_token = create_access_token(data={"sub": new_user.email} , expires_delta=access_token_expires)
 
     return {
         "access_token": jwt_token,
@@ -428,7 +429,8 @@ async def twitter_callback(
         db.commit()
         db.refresh(new_user)
 
-        jwt_token = create_access_token(data={"sub": new_user.email})
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        jwt_token = create_access_token(data={"sub": new_user.email} , expires_delta=access_token_expires)
 
         return {
             "access_token": jwt_token,
