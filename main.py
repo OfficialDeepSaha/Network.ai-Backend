@@ -389,6 +389,8 @@ async def twitter_callback(
         user_id = credentials.get("user_id")
         screen_name = credentials.get("screen_name")
 
+        print("This is your Twitter UserID:-" + user_id)
+
         if not access_token or not access_token_secret:
             raise HTTPException(status_code=400, detail="Failed to obtain access token.")
 
