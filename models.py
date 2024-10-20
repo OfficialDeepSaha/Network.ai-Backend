@@ -22,6 +22,7 @@ class User(Base):
     experience = Column(Text, nullable=True)
     goal = Column(Text, nullable=True)
     twitter_handle = Column(String)
+    twitter_id = Column(Integer)
     about = Column(String)
     github= Column(String)
     linkedin= Column(String)
