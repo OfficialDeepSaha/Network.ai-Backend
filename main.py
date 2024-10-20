@@ -338,8 +338,8 @@ def github_register(code: str, db: Session = Depends(get_db)):
 
 
 
-TWITTER_CLIENT_ID = "ePSpP4cXPjx7mOYXPlIJRfl5Q"
-TWITTER_CLIENT_SECRET = "ziBN8ZJiaPnEfPBHw5lH6jt19LMOs7Wtw4vf92GdLCilMwutbp"
+TWITTER_CLIENT_ID = "FxxH9cF8Wt8yMvyMKlOSMJ3tU"
+TWITTER_CLIENT_SECRET = "lM08jwMXKdkAPRnD6mzQmbJ6VpzO9O2Q3L5cO3KeveYRu3sK8u"
 TWITTER_CALLBACK_URL = "https://networkai.vercel.app/auth/twitter/callback"
 
 # Step 1: Initiate Twitter OAuth
