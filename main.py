@@ -420,6 +420,8 @@ async def twitter_callback(
             email=user_email,
             name=user_info.get("screen_name"),
             bio=user_info.get("description", ""),
+            twitter_handle= user_info.get("screen_name"),
+            twitter_id= user_id,
             password=None
         )
         db.add(new_user)
