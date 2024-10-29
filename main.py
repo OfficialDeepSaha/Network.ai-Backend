@@ -1854,8 +1854,7 @@ def get_recommendations(user_id: int, db: Session = Depends(get_db)):
     ).all()
 
     # Generate embeddings for the current user's profile
-    user_profile_text = f"Education: {user.education}\nExperience: {user.experience}\nGoals: {user.goal}"
-    user_embedding = utils.generate_embeddings(user_profile_text)
+    
 
     # Generate embeddings for other users' profiles
     other_user_profiles = [
@@ -1863,8 +1862,6 @@ def get_recommendations(user_id: int, db: Session = Depends(get_db)):
         for other_user in other_users
     ]
 
-    other_user_embeddings = utils.batch_generate_embeddings(other_user_profiles)
-    recommendations = []
 
     # Calculate similarity between the current user and others
     for other_user, other_user_embedding in zip(other_users, other_user_embeddings):
