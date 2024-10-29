@@ -1882,8 +1882,7 @@ def get_recommendations(user_id: int, db: Session = Depends(get_db)):
                 
             })
 
-    # Sort recommendations by similarity in descending order
-    recommendations.sort(key=lambda x: x['similarity'], reverse=True)
+    
     return recommendations
 
 
