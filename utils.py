@@ -16,11 +16,6 @@ openai.api_key = "sk-proj-vZp7gi9rgPN7ymXp_u4bfwjvt9WV9d0dyALm1kPBk_3kppmtBS1RgW
 logger = logging.getLogger("uvicorn.error")
 
 
-@lru_cache(maxsize=None)
-def generate_embeddings(text: str):
-    response = openai.Embedding.create(input=text, engine="text-embedding-ada-002")
-    return response['data'][0]['embedding']  # This should be a list
-
 def save_document(file, user_id):
     # Save file to local storage
     file_path = f"documents/user_{user_id}/{file.filename}"
@@ -31,18 +26,10 @@ def save_document(file, user_id):
 
 
 
-def batch_generate_embeddings(texts: list):
-    response = openai.Embedding.create(input=texts, engine="text-embedding-ada-002")
-    return [data['embedding'] for data in response['data']]
 
 def hash_password(password: str) -> str:
     return sha256(password.encode()).hexdigest()
 
-def calculate_similarity(embedding1, embedding2):
-    embedding1 = np.array(embedding1).reshape(1, -1)
-    embedding2 = np.array(embedding2).reshape(1, -1)
-    similarity_score = cosine_similarity(embedding1, embedding2)[0][0]
-    return similarity_score
 
 
 
